@@ -2,7 +2,7 @@
 A simple Node Express.js API to convert Html document to Pdf using Puppeteer.
 
 ## How to Build & Run - Docker
-1. Build image named export_html_to_pdf - `docker build -t export_html_to_pdf .`
+1. Build image named export_html_to_pdf - `docker build . -t export_html_to_pdf`
 2. Run image on port 80 - `docker run -itd --name export_html_to_pdf -p 80:80 export_html_to_pdf`
 
 ## How to Build & Run - Normal
