@@ -4,7 +4,7 @@ const express = require("express");
 var app = express();
 app.use(express.json());
 
-async function generatePdf(res, correlationId) {
+async function generatePdf(res, correlationId, format, orientation) {
   const html = res;
 
   // we are using headless mode
@@ -24,7 +24,10 @@ async function generatePdf(res, correlationId) {
   }); // apply available background styles while printing
   await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
 
-  const buffer = await page.pdf({ format: "A4" });
+  const buffer = await page.pdf({
+    format: pageFormat(format),
+    landscape: landscape(orientation),
+  });
 
   await browser.close();
 
@@ -48,12 +51,35 @@ function correlationId(req) {
   return correlationId;
 }
 
+function pageFormat(format) {
+  format = format == undefined ? "" : format;
+  const supportedFormats = [
+    "Letter",
+    "Legal",
+    "Tabloid",
+    "Ledger",
+    "A0",
+    "A1",
+    "A2",
+    "A3",
+    "A4",
+    "A5",
+    "A6",
+  ];
+  const index = supportedFormats.findIndex((i) => i == format);
+  return index === -1 ? supportedFormats[0] : format;
+}
+function landscape(orientation) {
+  orientation = orientation == undefined ? "" : orientation;
+  return orientation.toString().toUpperCase() === "LANDSCAPE";
+}
+
 app.post("/api/generate/pdf", async function (req, res) {
   var html = req.body.Html;
   const id = correlationId(req);
   console.log(`${id} : ${new Date().toLocaleString()} - Generating pdf...`);
 
-  await generatePdf(html, id)
+  await generatePdf(html, id, req.body.Format, req.body.Orientation)
     .then(async (buffer) => {
       res.status(200);
       res.setHeader("Content-Type", "application/pdf");
