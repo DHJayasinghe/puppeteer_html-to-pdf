@@ -27,6 +27,8 @@ Content-Type: application/json
 Content-Length: 40
 
 {
-    "Html": "<h1>Your pdf html string comes here</h1>"
+    "Html": "<h1>Your pdf html string comes here</h1>",
+    "Format": "A4",
+    "Orientation":"Portrait"
 }
 ```
