@@ -1,21 +1,32 @@
+process.setMaxListeners(1000); 
+
 const puppeteer = require("puppeteer");
 const express = require("express");
 
 var app = express();
 app.use(express.json());
 
-async function generatePdf(res, correlationId, format, orientation) {
-  const html = res;
+let browser;
+const launchBrowser = async () => {
+  if (browser) return;
 
   // we are using headless mode
-  const browser = await puppeteer.launch({
+  browser = await puppeteer.launch({
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
       "--disable-dev-shm-usage",
     ],
   });
+};
+
+async function generatePdf(res, correlationId, format, orientation) {
+  const html = res;
+
+  await launchBrowser();
   const page = await browser.newPage();
+  // Configure the navigation timeout
+  page.setDefaultNavigationTimeout(0);
 
   // We set the page content as the generated html by handlebars
   await page.setContent(html);
@@ -29,8 +40,7 @@ async function generatePdf(res, correlationId, format, orientation) {
     landscape: landscape(orientation),
   });
 
-  await browser.close();
-
+  await page.close();
   console.log(
     `${correlationId} : ${new Date().toLocaleString()} - PDF Generated`
   );
