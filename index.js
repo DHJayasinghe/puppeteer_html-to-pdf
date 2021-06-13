@@ -1,7 +1,14 @@
-process.setMaxListeners(1000); 
+process.setMaxListeners(1000);
 
 const puppeteer = require("puppeteer");
 const express = require("express");
+const Mutex = require("async-mutex").Mutex;
+
+const MAX_TABS = 25; // MORE BROWSER TABS, MORE RAM
+const locks = [];
+for (i = 0; i < MAX_TABS; i++) {
+  locks[i] = new Mutex(); // creates a shared mutex instance
+}
 
 var app = express();
 app.use(express.json());
@@ -19,31 +26,39 @@ const launchBrowser = async () => {
     ],
   });
 };
+let pages = [];
+const createPage = async (pageToUse) => {
+  if (pages[pageToUse]) {
+    // console.log(`Returning opened page: ${pageToUse}`);
+    return pages[pageToUse];
+  }
 
-async function generatePdf(res, correlationId, format, orientation) {
-  const html = res;
-
-  await launchBrowser();
+  // console.log(`Creating new page: ${pageToUse}`);
   const page = await browser.newPage();
-  // Configure the navigation timeout
-  page.setDefaultNavigationTimeout(0);
-
-  // We set the page content as the generated html by handlebars
-  await page.setContent(html);
   await page.addStyleTag({
     content: "@media print {body {-webkit-print-color-adjust: exact;}}",
   }); // apply available background styles while printing
-  await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
+  pages[pageToUse] = page;
+  return page;
+};
 
-  const buffer = await page.pdf({
-    format: pageFormat(format),
-    landscape: landscape(orientation),
-  });
+async function generatePdf(html, format, orientation, pageToUse) {
+  await launchBrowser();
+  const page = await createPage(pageToUse);
 
-  await page.close();
-  console.log(
-    `${correlationId} : ${new Date().toLocaleString()} - PDF Generated`
-  );
+  const release = await locks[pageToUse].acquire(); // acquires access to the critical path
+  let buffer;
+  try {
+    await page.setContent(html); // set the page content
+    await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
+    buffer = await page.pdf({
+      format: pageFormat(format),
+      landscape: landscape(orientation),
+    });
+  } finally {
+    release();
+  }
+
   return buffer;
 }
 
@@ -79,18 +94,32 @@ function pageFormat(format) {
   const index = supportedFormats.findIndex((i) => i == format);
   return index === -1 ? supportedFormats[0] : format;
 }
+
 function landscape(orientation) {
   orientation = orientation == undefined ? "" : orientation;
   return orientation.toString().toUpperCase() === "LANDSCAPE";
 }
 
+let NEXT_TAB_TO_USE = 0;
+function pickTabToProcess() {
+  NEXT_TAB_TO_USE = NEXT_TAB_TO_USE += 1;
+  if (NEXT_TAB_TO_USE == MAX_TABS) NEXT_TAB_TO_USE = 0;
+
+  return NEXT_TAB_TO_USE;
+}
+
 app.post("/api/generate/pdf", async function (req, res) {
-  var html = req.body.Html;
   const id = correlationId(req);
   console.log(`${id} : ${new Date().toLocaleString()} - Generating pdf...`);
 
-  await generatePdf(html, id, req.body.Format, req.body.Orientation)
+  await generatePdf(
+    req.body.Html,
+    req.body.Format,
+    req.body.Orientation,
+    pickTabToProcess()
+  )
     .then(async (buffer) => {
+      console.log(`${id} : ${new Date().toLocaleString()} - PDF Generated`);
       res.status(200);
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader(
@@ -98,11 +127,10 @@ app.post("/api/generate/pdf", async function (req, res) {
         "attachment; filename=some_file.pdf"
       );
       res.setHeader("Content-Length", buffer.length);
-      //res.end(pdfData);
       res.end(buffer);
     })
     .catch((err) => {
-      console.error(err);
+      console.error(`${id} : ${err}`);
       res.end("There was an error while generating pdf from html");
     });
 });
