@@ -4,7 +4,8 @@ const puppeteer = require("puppeteer");
 const express = require("express");
 const Mutex = require("async-mutex").Mutex;
 
-const MAX_TABS = 25; // MORE BROWSER TABS, MORE RAM
+const HIGHER_PERFORMANCE_MORE_RAM = false;
+const MAX_TABS = 15; // MORE BROWSER TABS, MORE RAM
 const locks = [];
 for (i = 0; i < MAX_TABS; i++) {
   locks[i] = new Mutex(); // creates a shared mutex instance
@@ -27,8 +28,8 @@ const launchBrowser = async () => {
   });
 };
 let pages = [];
-const createPage = async (pageToUse) => {
-  if (pages[pageToUse]) {
+const createPage = async (pageToUse, reuse) => {
+  if (pages[pageToUse] && reuse) {
     // console.log(`Returning opened page: ${pageToUse}`);
     return pages[pageToUse];
   }
@@ -44,19 +45,29 @@ const createPage = async (pageToUse) => {
 
 async function generatePdf(html, format, orientation, pageToUse) {
   await launchBrowser();
-  const page = await createPage(pageToUse);
+  const page = await createPage(pageToUse, HIGHER_PERFORMANCE_MORE_RAM);
 
-  const release = await locks[pageToUse].acquire(); // acquires access to the critical path
-  let buffer;
-  try {
+  if (HIGHER_PERFORMANCE_MORE_RAM) {
+    const release = await locks[pageToUse].acquire(); // acquires access to the critical path
+    let buffer;
+    try {
+      await page.setContent(html); // set the page content
+      await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
+      buffer = await page.pdf({
+        format: pageFormat(format),
+        landscape: landscape(orientation),
+      });
+    } finally {
+      release();
+    }
+  } else {
     await page.setContent(html); // set the page content
     await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
     buffer = await page.pdf({
       format: pageFormat(format),
       landscape: landscape(orientation),
     });
-  } finally {
-    release();
+    await page.close();
   }
 
   return buffer;
