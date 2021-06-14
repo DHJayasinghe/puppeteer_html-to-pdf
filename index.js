@@ -43,32 +43,35 @@ const createPage = async (pageToUse, reuse) => {
   return page;
 };
 
-async function generatePdf(html, format, orientation, pageToUse) {
+async function generatePdf(
+  html,
+  format,
+  orientation,
+  pageToUse,
+  width,
+  height
+) {
   await launchBrowser();
   const page = await createPage(pageToUse, HIGHER_PERFORMANCE_MORE_RAM);
+  let config = pdfConfigs(format, width, height, orientation);
+  console.log(JSON.stringify(config));
+  let buffer;
 
   if (HIGHER_PERFORMANCE_MORE_RAM) {
     const release = await locks[pageToUse].acquire(); // acquires access to the critical path
-    let buffer;
+
     try {
       await page.setContent(html); // set the page content
       await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
-      buffer = await page.pdf({
-        format: pageFormat(format),
-        landscape: landscape(orientation),
-        printBackground: true,
-      });
+
+      buffer = await page.pdf(config);
     } finally {
       release();
     }
   } else {
     await page.setContent(html); // set the page content
     await page.evaluateHandle("document.fonts.ready"); // await until custom fonts are loaded
-    buffer = await page.pdf({
-      format: pageFormat(format),
-      landscape: landscape(orientation),
-      printBackground: true,
-    });
+    buffer = await page.pdf(config);
     await page.close();
   }
 
@@ -89,9 +92,13 @@ function correlationId(req) {
   return correlationId;
 }
 
-function pageFormat(format) {
-  format = format == undefined ? "" : format;
+function pdfConfigs(format, width, height, orientation) {
+  const _format = format == undefined ? "" : format.toString().toLowerCase();
+  const _width = isNaN(width) ? 1000 : Number(width);
+  const _height = isNaN(height) ? 1000 : Number(height);
+
   const supportedFormats = [
+    "Custom",
     "Letter",
     "Legal",
     "Tabloid",
@@ -104,8 +111,21 @@ function pageFormat(format) {
     "A5",
     "A6",
   ];
-  const index = supportedFormats.findIndex((i) => i == format);
-  return index === -1 ? supportedFormats[0] : format;
+  const index = supportedFormats.findIndex((i) => i.toLowerCase() == _format);
+  if (index === 0) {
+    // custom page
+    return {
+      printBackground: true,
+      width: _width,
+      height: _height,
+      landscape: landscape(orientation),
+    };
+  }
+  return {
+    printBackground: true,
+    format: index === -1 ? supportedFormats[1] : supportedFormats[index],
+    landscape: landscape(orientation),
+  };
 }
 
 function landscape(orientation) {
@@ -129,7 +149,9 @@ app.post("/api/generate/pdf", async function (req, res) {
     req.body.Html,
     req.body.Format,
     req.body.Orientation,
-    pickTabToProcess()
+    pickTabToProcess(),
+    req.body.Width,
+    req.body.Height
   )
     .then(async (buffer) => {
       console.log(`${id} : ${new Date().toLocaleString()} - PDF Generated`);
