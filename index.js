@@ -56,6 +56,7 @@ async function generatePdf(html, format, orientation, pageToUse) {
       buffer = await page.pdf({
         format: pageFormat(format),
         landscape: landscape(orientation),
+        printBackground: true,
       });
     } finally {
       release();
@@ -66,6 +67,7 @@ async function generatePdf(html, format, orientation, pageToUse) {
     buffer = await page.pdf({
       format: pageFormat(format),
       landscape: landscape(orientation),
+      printBackground: true,
     });
     await page.close();
   }
