@@ -16,9 +16,9 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-
+        
     - name: Build the Docker image
-      run: docker build . --file SampleApp/Catalog/Dockerfile --tag hasitha2kandy/html-to-pdf-converter:${{env.version}}
+      run: docker build . --tag hasitha2kandy/html-to-pdf-converter:${{env.version}}
 
     - name: Tag the Latest image
       run: docker tag hasitha2kandy/html-to-pdf-converter:${{env.version}} hasitha2kandy/html-to-pdf-converter:latest
