@@ -16,9 +16,15 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USER }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: 'Set image Version flag'
+      run: echo "version=$(date +%s)"  >> $GITHUB_ENV
+        
+    - name: 'Print the image version'
+      run: echo "${{ env.version }}"
         
     - name: Build the Docker image
-      run: docker build . -t hasitha2kandy/html-to-pdf-converter:${{env.version}}
+      run: docker build . --tag hasitha2kandy/html-to-pdf-converter:${{env.version}}
 
     - name: Tag the Latest image
       run: docker tag hasitha2kandy/html-to-pdf-converter:${{env.version}} hasitha2kandy/html-to-pdf-converter:latest
