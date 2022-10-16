@@ -1,4 +1,4 @@
-# [puppeteer_html-to-pdf](https://github.com/DHJayasinghe/puppeteer_html-to-pdf)
+# [Html-To-Pdf converter](https://github.com/DHJayasinghe/puppeteer_html-to-pdf)
 A simple Node Express.js API to convert Html document to Pdf using Puppeteer.
 
 ## How to Build & Run - Docker
