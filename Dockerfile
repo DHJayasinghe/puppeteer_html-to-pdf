@@ -1,4 +1,4 @@
-FROM alpine:edge
+FROM alpine:latest
 EXPOSE 80
 
 # Installs latest Chromium (85) package.
